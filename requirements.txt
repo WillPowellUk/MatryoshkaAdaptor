@@ -1,1 +1,6 @@
 sentence-transformers
+mteb
+beir
+datasets
+wandb
+sklearn
