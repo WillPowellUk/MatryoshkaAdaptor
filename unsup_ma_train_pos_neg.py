@@ -301,7 +301,7 @@ def supervised_objective_fn_loss(ori_query_embeddings, ori_corpus_embeddings, ma
 import torch
 from torch.optim import Adam
 import wandb
-import tqdm
+from tqdm import tqdm
 
 def train(model, mat_adaptor, train_loader, loss_fn, config, run_name):
     """
@@ -426,7 +426,7 @@ import torch
 ds = load_dataset("BeIR/webis-touche2020", "corpus")
 
 # Access the 'corpus' dataset
-dataset = ds['corpus']['text']
+dataset = ds['corpus']
 
 # Define the split sizes
 train_size = int(0.7 * len(dataset))
@@ -434,6 +434,41 @@ test_size = len(dataset) - train_size
 
 # Split the dataset
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+import random
+from sentence_transformers import InputExample
+
+# Convert the corpus into a list of documents
+documents = [doc['text'] for doc in train_dataset]
+
+# Create positive and negative pairs
+positive_pairs = []
+negative_pairs = []
+
+# You can create positive pairs by selecting sentences from the same or related documents
+for doc in documents:
+    sentences = doc.split('.')  # Simple split by period to get sentences
+    if len(sentences) < 2:
+        continue  # Skip documents with less than 2 sentences
+
+    # Randomly sample two sentences from the same document to create a positive pair
+    sent1, sent2 = random.sample(sentences, 2)
+    positive_pairs.append(InputExample(texts=[sent1.strip(), sent2.strip()], label=1.0))
+
+    # Create a negative pair by selecting a sentence from a different document
+    if len(documents) > 1:
+        negative_doc = random.choice(documents)
+        negative_sentence = random.choice(negative_doc.split('.'))
+        negative_pairs.append(InputExample(texts=[sent1.strip(), negative_sentence.strip()], label=0.0))
+
+# Combine positive and negative pairs for training
+train_samples = positive_pairs + negative_pairs
+
+from torch.utils.data import DataLoader
+from sentence_transformers import losses
+
+# Create a DataLoader
+train_dataloader = DataLoader(train_samples, shuffle=True, batch_size=128)
 
 from sentence_transformers import SentenceTransformer
 
@@ -457,8 +492,8 @@ hyperparams = {
 }
 
 # Create DataLoader for train and test datasets
-train_dataloader = DataLoader(train_dataset, batch_size=hyperparams['batch_size'], shuffle=True)
+# train_dataloader = DataLoader(train_dataset, batch_size=hyperparams['batch_size'], shuffle=True)
 
-run_name = "ckpts/unsupervised_ma/touche2020/text-only"
+run_name = "ckpts/unsupervised_ma/touche2020/pairs-only"
 train(model, mat_adaptor, train_dataloader, unsupervised_objective_fn_loss, hyperparams, run_name)
 
