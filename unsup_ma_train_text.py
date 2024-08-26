@@ -1,6 +1,14 @@
 import torch
 import torch.nn.functional as F
 
+# Limit PyTorch to use only 8 threads
+torch.set_num_threads(8)
+torch.set_num_interop_threads(8)
+
+import numpy as np
+import os
+
+
 # Define MatryoshkaAdaptor module - a simple MLP with skip connection
 class MatryoshkaAdaptor(torch.nn.Module):
     """
@@ -48,6 +56,8 @@ class MatryoshkaAdaptor(torch.nn.Module):
         
         # Add the skip connection by adding the original embedding to the adapted embedding
         mat_embedding = adapted_embedding + embedding
+        mat_embedding = hidden_embedding + embedding
+
 
         return mat_embedding
     
@@ -373,11 +383,12 @@ def train(model, mat_adaptor, train_loader, loss_fn, config, run_name):
             loss.backward()        # Compute gradients
             optimizer.step()       # Update weights
 
-            print(F"Loss: {loss.item():.4f}")
+            print(f"Loss: {loss.item():.4f}")
             total_loss += loss.item()
 
         # Calculate average loss for the epoch
         avg_loss = total_loss / len(train_loader)
+        
         
         # Log the average loss to W&B
         if config.get('wandb', False):
@@ -422,18 +433,16 @@ from torch.utils.data import DataLoader, random_split
 import torch
 
 # Load the dataset
-# ds = load_dataset("BeIR/nfcorpus", "corpus")
-ds = load_dataset("BeIR/webis-touche2020", "corpus")
+ds_1 = load_dataset("BeIR/nfcorpus", "corpus")
+ds_2 = load_dataset("BeIR/webis-touche2020", "corpus")
+ds_3 = load_dataset("BeIR/quora", "corpus")
+ds_4 = load_dataset("BeIR/scifact", "corpus")
 
 # Access the 'corpus' dataset
-dataset = ds['corpus']['text']
-
-# Define the split sizes
-train_size = int(0.7 * len(dataset))
-test_size = len(dataset) - train_size
-
-# Split the dataset
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+dataset_1 = ds_1['corpus']['text']
+dataset_2 = ds_2['corpus']['text']
+dataset_3 = ds_3['corpus']['text']
+dataset_4 = ds_4['corpus']['text']
 
 from sentence_transformers import SentenceTransformer
 
@@ -446,9 +455,9 @@ hidden_dim = input_output_dim # Let hidden layer dimension equal the embedding m
 mat_adaptor = MatryoshkaAdaptor(input_output_dim, hidden_dim)
 
 hyperparams = {
-    'epochs': 5,
-    'lr': 1e-3,
-    'batch_size': 256,
+    'epochs': 2,
+    'lr': 5e-3,
+    'batch_size': 128,
     'k': 5,  # Top-k similarity loss
     'm_dims': [64, 128, 256],  # Matryoshka embedding dimensions
     'alpha': 1.0,  # Pairwise similarity loss scaling factor (alpha in paper)
@@ -456,9 +465,27 @@ hyperparams = {
     'wandb': True
 }
 
-# Create DataLoader for train and test datasets
-train_dataloader = DataLoader(train_dataset, batch_size=hyperparams['batch_size'], shuffle=True)
+import os
 
-run_name = "ckpts/unsupervised_ma/touche2020/text-only"
-train(model, mat_adaptor, train_dataloader, unsupervised_objective_fn_loss, hyperparams, run_name)
+for i, dataset in enumerate([dataset_1, dataset_2, dataset_3, dataset_4]):
+    # Define the split sizes
+    train_size = int(1.0 * len(dataset))
+    test_size = len(dataset) - train_size
 
+    if i == 3:
+        hyperparams['epochs'] = 5
+
+    # Split the dataset
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+    # Create DataLoader for train and test datasets
+    train_dataloader = DataLoader(train_dataset, batch_size=hyperparams['batch_size'], shuffle=True)
+
+
+    # Define the directory path
+    run_name = "ckpts/unsupervised_ma/multi-dataset/text-only"
+
+    # Create the directory if it doesn't exist
+    os.makedirs(run_name, exist_ok=True)
+
+    train(model, mat_adaptor, train_dataloader, unsupervised_objective_fn_loss, hyperparams, run_name)
