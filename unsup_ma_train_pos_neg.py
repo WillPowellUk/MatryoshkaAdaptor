@@ -203,10 +203,10 @@ def unsupervised_objective_fn_loss(ori_corpus_embeddings, mat_corpus_embeddings,
     # Compute the individual loss components
     topk_loss = topk_similarity_loss(ori_corpus_embeddings, mat_corpus_embeddings, m_dims, k)
     pairwise_loss = pairwise_similarity_loss(ori_corpus_embeddings, mat_corpus_embeddings, m_dims)
-    reg_loss = reconstruction_loss(ori_corpus_embeddings, mat_corpus_embeddings, beta)
+    rec_loss = reconstruction_loss(ori_corpus_embeddings, mat_corpus_embeddings, beta)
     
     # Combine the losses with the given scaling factors
-    total_loss = topk_loss + alpha * pairwise_loss + beta * reg_loss
+    total_loss = topk_loss + alpha * pairwise_loss + beta * rec_loss
     
     return total_loss
 
@@ -288,11 +288,11 @@ def supervised_objective_fn_loss(ori_query_embeddings, ori_corpus_embeddings, ma
     # Compute the individual loss components
     #topk_loss = topk_similarity_loss(ori_corpus_embeddings, mat_corpus_embeddings, m_dims, k)
     #pairwise_loss = pairwise_similarity_loss(ori_corpus_embeddings, mat_corpus_embeddings, m_dims)
-    #reg_loss = reconstruction_loss(ori_corpus_embeddings, mat_corpus_embeddings, beta)
+    #rec_loss = reconstruction_loss(ori_corpus_embeddings, mat_corpus_embeddings, beta)
     ranking_loss = matryoshka_ranking_loss(ori_corpus_embeddings, mat_corpus_embeddings, relevance_scores, m_dims)
 
     # Combine the losses with the given scaling factors
-    #total_loss = topk_loss + alpha * pairwise_loss + beta * reg_loss + gamma * ranking_loss
+    #total_loss = topk_loss + alpha * pairwise_loss + beta * rec_loss + gamma * ranking_loss
     total_loss = ranking_loss
     
     return total_loss
